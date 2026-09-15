@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build
+frontend/dist/
+frontend/build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Python/Django
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Artefak data / dump DB (turunan, bukan source)
+qontak_sales-regions-only.sql
+qontak_sales-full-db.dump
+data-wilayah/
+data-wilayah-indonesia.xlsx
+*.dump

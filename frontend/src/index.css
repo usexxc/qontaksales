@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #2563eb;
+  --color-secondary: #3b82f6;
+  --color-accent: #059669;
+  --color-background: #f8fafc;
+  --color-foreground: #0f172a;
+  --color-muted: #f1f5fd;
+  --app-border: #e4ecfc;
+  --color-app-border: #e4ecfc;
+  --color-destructive: #dc2626;
+
+  --font-heading: "Plus Jakarta Sans", sans-serif;
+  --font-body: "Inter", "Open Sans", sans-serif;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--color-foreground);
+  background: var(--color-background);
+  margin: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spinner {
+  border-radius: 9999px;
+  border-style: solid;
+  border-color: currentColor;
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+  animation: spin 0.8s linear infinite;
+}
