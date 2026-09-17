@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
+from .models import Company
 from .permissions import IsManager
 from .serializers import (
     AgentCreateSerializer,
@@ -46,6 +47,8 @@ class ProfileView(APIView):
         serializer.save()
         return Response(serializer.data)
 
+    patch = put  # upload avatar via multipart: PUT/PATCH sama saja (partial)
+
 
 class DashboardStatsView(APIView):
     def get(self, request):
@@ -53,13 +56,8 @@ class DashboardStatsView(APIView):
         from qontak_sales.apps.coa.models import COA
         from qontak_sales.apps.customers.models import Customer
 
-        company = request.user.company
-        users = User.objects.filter(company=company) if company else User.objects.none()
-        customers = (
-            Customer.objects.filter(company=company)
-            if company
-            else Customer.objects.none()
-        )
+        users = User.objects.all()
+        customers = Customer.objects.all()
         status_counts = {
             row["status"]: row["n"]
             for row in customers.values("status").annotate(n=Count("id"))
@@ -71,7 +69,8 @@ class DashboardStatsView(APIView):
             .annotate(n=Count("id"))
             .order_by("-n")[:5]
         ]
-        coa_total = COA.objects.filter(company=company).aggregate(s=Sum("saldo"))["s"] or 0
+        coa_total = COA.objects.aggregate(s=Sum("saldo"))["s"] or 0
+        company = Company.get()
 
         return Response({
             "company_name": company.name if company else "",
@@ -92,7 +91,7 @@ class AgentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return User.objects.filter(
-            company=self.request.user.company, role="AGENT", is_active=True
+            role="AGENT", is_active=True
         ).order_by("first_name", "last_name")
 
     def create(self, request, *args, **kwargs):
@@ -106,7 +105,6 @@ class AgentViewSet(viewsets.ModelViewSet):
             first_name=data.get("first_name", ""),
             last_name=data.get("last_name", ""),
             phone=data.get("phone", ""),
-            company=request.user.company,
             role="AGENT",
         )
         if data.get("avatar"):

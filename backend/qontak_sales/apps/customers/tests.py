@@ -16,33 +16,31 @@ User = get_user_model()
 
 class CustomerAPITests(APITestCase):
     def setUp(self):
-        self.company_a = Company.objects.create(name="PT A")
-        self.company_b = Company.objects.create(name="PT B")
         self.manager = User.objects.create_user(
             username="mgr@a.com", email="mgr@a.com",
-            password="***", company=self.company_a, role="MANAGER",
+            password="***", role="MANAGER",
         )
         self.agent = User.objects.create_user(
             username="agt@a.com", email="agt@a.com",
-            password="***", company=self.company_a, role="AGENT",
+            password="***", role="AGENT",
         )
-        self.other_mgr = User.objects.create_user(
-            username="mgr@b.com", email="mgr@b.com",
-            password="***", company=self.company_b, role="MANAGER",
+        self.other_agent = User.objects.create_user(
+            username="agt@b.com", email="agt@b.com",
+            password="***", role="AGENT",
         )
         self.cust_own = Customer.objects.create(
-            name="Cust A", company=self.company_a, agent=self.agent
+            name="Cust A", agent=self.agent
         )
         self.cust_other = Customer.objects.create(
-            name="Cust B", company=self.company_b
+            name="Cust B"
         )
 
-    def test_manager_sees_only_own_company(self):
+    def test_manager_sees_all(self):
         self.client.force_authenticate(self.manager)
         res = self.client.get("/api/customers/")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        names = [c["name"] for c in res.data["results"]]
-        self.assertEqual(names, ["Cust A"])
+        names = sorted(c["name"] for c in res.data["results"])
+        self.assertEqual(names, ["Cust A", "Cust B"])
 
     def test_agent_only_sees_assigned(self):
         self.client.force_authenticate(self.agent)
@@ -50,11 +48,11 @@ class CustomerAPITests(APITestCase):
         names = [c["name"] for c in res.data["results"]]
         self.assertEqual(names, ["Cust A"])
 
-    def test_agent_cannot_assign_foreign_agent(self):
+    def test_agent_cannot_assign_non_agent(self):
         self.client.force_authenticate(self.manager)
         res = self.client.post(
             "/api/customers/",
-            {"name": "X", "agent": self.other_mgr.id},
+            {"name": "X", "agent": self.manager.id},
             format="json",
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
@@ -96,24 +94,22 @@ class CustomerAPITests(APITestCase):
 
 class CustomerExportTests(APITestCase):
     def setUp(self):
-        self.company_a = Company.objects.create(name="PT A")
-        self.company_b = Company.objects.create(name="PT B")
         self.manager = User.objects.create_user(
             username="mgr@a.com", email="mgr@a.com",
-            password="***", company=self.company_a, role="MANAGER",
+            password="***", role="MANAGER",
         )
         self.agent = User.objects.create_user(
             username="agt@a.com", email="agt@a.com",
-            password="***", company=self.company_a, role="AGENT",
+            password="***", role="AGENT",
         )
         Customer.objects.create(
-            name="Cust A", company=self.company_a, agent=self.agent, status="CUSTOMER"
+            name="Cust A", agent=self.agent, status="CUSTOMER"
         )
         Customer.objects.create(
-            name="Cust B", company=self.company_a, agent=None, status="PROSPECT"
+            name="Cust B", agent=None, status="PROSPECT"
         )
         Customer.objects.create(
-            name="Cust C", company=self.company_b
+            name="Cust C"
         )
 
     def test_export_xlsx_bisa_dibaca(self):
@@ -123,7 +119,7 @@ class CustomerExportTests(APITestCase):
 
         wb = load_workbook(io.BytesIO(res.content))
         names = [row[0] for row in wb.active.iter_rows(min_row=2, values_only=True)]
-        self.assertEqual(sorted(names), ["Cust A", "Cust B"])
+        self.assertEqual(sorted(names), ["Cust A", "Cust B", "Cust C"])
 
     def test_export_agent_cuma_milik_sendiri(self):
         self.client.force_authenticate(self.agent)
@@ -142,10 +138,9 @@ class CustomerExportTests(APITestCase):
 
 class CustomerImportCsvTests(APITestCase):
     def setUp(self):
-        self.company = Company.objects.create(name="PT A")
         self.manager = User.objects.create_user(
             username="mgr@a.com", email="mgr@a.com",
-            password="***", company=self.company, role="MANAGER",
+            password="***", role="MANAGER",
         )
 
     def _upload(self, content, filename="import.csv", user=None):

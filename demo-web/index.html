@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo Kompresi Gambar</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    background: #f1f5f9; margin: 0; padding: 40px 16px;
+    color: #0f172a;
+  }
+  main { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.sub { color: #64748b; font-size: 13px; margin: 0 0 20px; }
+  .card {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+    padding: 20px; margin-bottom: 16px;
+  }
+  label {
+    display: inline-block; cursor: pointer;
+    background: #1e293b; color: #fff; border-radius: 8px;
+    padding: 10px 16px; font-size: 14px; font-weight: 600;
+  }
+  label:hover { background: #334155; }
+  input[type=file] { display: none; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  figure { margin: 0; text-align: center; }
+  img { max-width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; }
+  figcaption { font-size: 12px; color: #64748b; margin-top: 8px; }
+  .stats { font-size: 14px; line-height: 1.9; }
+  .ok { color: #047857; font-weight: 700; }
+  .bad { color: #b91c1c; font-weight: 700; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Demo Foto Profil Customer</h1>
+
+  <div class="card">
+    <label>
+      Pilih gambar
+      <input type="file" id="file" accept="image/*">
+    </label>
+    <span id="namafile" style="font-size:13px;color:#64748b;margin-left:10px"></span>
+  </div>
+
+  <div class="card hidden" id="hasil">
+    <figure style="text-align:center">
+      <img id="sesudah" style="width:96px;height:96px;border-radius:50%;object-fit:cover">
+      <figcaption>Hasil jadi foto profil &mdash; <span id="sizeSesudah"></span></figcaption>
+    </figure>
+    <div class="stats" style="margin-top:16px" id="detail"></div>
+  </div>
+</main>
+
+<script>
+const fileInput = document.getElementById("file");
+
+fileInput.addEventListener("change", async () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+  document.getElementById("namafile").textContent = file.name;
+
+  const box = document.getElementById("hasil");
+  const detail = document.getElementById("detail");
+
+  // cek di sisi browser dulu buat UX, server tetap jadi penegak utama
+  if (file.size > 1024 * 1024) {
+    box.classList.remove("hidden");
+    detail.innerHTML =
+      '<span class="bad">File terlalu besar (' +
+      (file.size / 1024).toFixed(0) + " KB). Foto profil maksimal 1 MB.</span>";
+    return;
+  }
+
+  const res = await fetch("/api/kompres", { method: "POST", body: file });
+  const data = await res.json();
+
+  if (!res.ok) {
+    box.classList.remove("hidden");
+    detail.innerHTML = '<span class="bad">' + data.error + "</span>";
+    return;
+  }
+
+  const kb = (n) => (n / 1024).toFixed(1) + " KB";
+  document.getElementById("sesudah").src =
+    "data:image/jpeg;base64," + data.image_b64;
+  document.getElementById("sizeSesudah").textContent =
+    kb(data.new_size) + " (dari " + kb(data.original_size) + " " + data.format_asli + ")";
+
+  detail.innerHTML =
+    "Hemat: <b>" + kb(data.original_size - data.new_size) + "</b>";
+
+  box.classList.remove("hidden");
+});
+</script>
+</body>
+</html>

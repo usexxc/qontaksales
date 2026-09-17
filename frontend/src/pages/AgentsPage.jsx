@@ -111,6 +111,11 @@ export default function AgentsPage() {
   const handleAvatarChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 1024 * 1024) {
+      toast("Ukuran foto maksimal 1 MB.", "error");
+      e.target.value = "";
+      return;
+    }
     setAvatarFile(file);
     setAvatarPreview(URL.createObjectURL(file));
   };

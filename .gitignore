@@ -29,6 +29,10 @@ venv/
 .DS_Store
 Thumbs.db
 
+# Media (hasil upload user + demo, bukan source code)
+backend/media/
+demo_output/
+
 # Artefak data / dump DB (turunan, bukan source)
 qontak_sales-regions-only.sql
 qontak_sales-full-db.dump

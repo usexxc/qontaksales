@@ -113,7 +113,22 @@ export default function CustomerTable({
                     key={customer.id}
                     className="border-b border-app-border/60 last:border-0"
                   >
-                    <td className="px-4 py-2.5 font-medium">{customer.name}</td>
+                    <td className="px-4 py-2.5 font-medium">
+                      <div className="flex items-center gap-2">
+                        {customer.avatar_url ? (
+                          <img
+                            src={customer.avatar_url}
+                            alt={customer.name}
+                            className="h-8 w-8 shrink-0 rounded-full object-cover"
+                          />
+                        ) : (
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground/50">
+                            {(customer.name || "?")[0].toUpperCase()}
+                          </span>
+                        )}
+                        {customer.name}
+                      </div>
+                    </td>
                     <td className="px-4 py-2.5">{customer.company_name || "-"}</td>
                     <td className="px-4 py-2.5">{customer.email || "-"}</td>
                     <td className="px-4 py-2.5">{customer.phone || "-"}</td>

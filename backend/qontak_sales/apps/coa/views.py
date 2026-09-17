@@ -17,7 +17,7 @@ class COAViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        return COA.objects.filter(company=self.request.user.company)
+        return COA.objects.all()
 
     def perform_create(self, serializer):
-        serializer.save(company=self.request.user.company)
+        serializer.save()

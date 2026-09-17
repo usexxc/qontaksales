@@ -8,6 +8,7 @@ import random
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
+from qontak_sales.apps.accounts.models import Company
 from qontak_sales.apps.customers.models import Customer
 from qontak_sales.apps.regions.models import District, Province, Regency, Village
 
@@ -72,9 +73,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **opts):
         mgr = User.objects.filter(email__iexact=opts["email"]).first()
-        if not mgr or not mgr.company:
-            raise CommandError(f"Manager '{opts['email']}' / company-nya gak ditemukan.")
-        company = mgr.company
+        if not mgr:
+            raise CommandError(f"Manager '{opts['email']}' gak ditemukan.")
+        company, _ = Company.objects.get_or_create(name="PT Test")
 
         provinces = list(Province.objects.all())
         if not provinces:
@@ -96,15 +97,13 @@ class Command(BaseCommand):
                     first_name=first,
                     last_name=last,
                     phone=phone,
-                    company=company,
                     role="AGENT",
                 )
             else:
-                user.company = company
                 user.role = "AGENT"
                 user.is_active = True
                 user.save()
-        agents = list(User.objects.filter(company=company, role="AGENT", is_active=True))
+        agents = list(User.objects.filter(role="AGENT", is_active=True))
         self.stdout.write(f"Agent aktif: {len(agents)}")
 
         # isi data customer demo
@@ -116,7 +115,6 @@ class Command(BaseCommand):
             district = random.choice(list(District.objects.filter(regency=regency)))
             village = random.choice(list(Village.objects.filter(district=district)))
             defaults = dict(
-                company=company,
                 company_name=pt,
                 email=email,
                 phone=f"021-{1000000 + i * 7777}",
@@ -134,7 +132,7 @@ class Command(BaseCommand):
             n_upd += not created
         self.stdout.write(
             self.style.SUCCESS(
-                f"Customer baru: {n_new}, diperbarui: {n_upd}, total: {Customer.objects.filter(company=company).count()}"
+                f"Customer baru: {n_new}, diperbarui: {n_upd}, total: {Customer.objects.count()}"
             )
         )
         self.stdout.write("Login agent demo: siti@pttest.test / Agent12345")

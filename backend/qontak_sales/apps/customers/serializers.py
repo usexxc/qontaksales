@@ -1,10 +1,13 @@
 from rest_framework import serializers
 
+from qontak_sales.apps.accounts.models import CustomUser
+
 from .models import Customer
 
 
 class CustomerSerializer(serializers.ModelSerializer):
     agent_name = serializers.SerializerMethodField()
+    avatar_url = serializers.SerializerMethodField()
     province_name = serializers.CharField(source="province.name", read_only=True, default=None)
     regency_name = serializers.CharField(source="regency.name", read_only=True, default=None)
     district_name = serializers.CharField(source="district.name", read_only=True, default=None)
@@ -14,7 +17,6 @@ class CustomerSerializer(serializers.ModelSerializer):
         model = Customer
         fields = [
             "id",
-            "company",
             "name",
             "company_name",
             "email",
@@ -31,14 +33,16 @@ class CustomerSerializer(serializers.ModelSerializer):
             "status",
             "agent",
             "agent_name",
+            "avatar",
+            "avatar_url",
             "notes",
             "created_at",
             "updated_at",
         ]
         read_only_fields = [
             "id",
-            "company",
             "agent_name",
+            "avatar_url",
             "province_name",
             "regency_name",
             "district_name",
@@ -52,12 +56,24 @@ class CustomerSerializer(serializers.ModelSerializer):
             return f"{obj.agent.first_name} {obj.agent.last_name}".strip()
         return None
 
+    def get_avatar_url(self, obj):
+        request = self.context.get("request")
+        if obj.avatar and request:
+            return request.build_absolute_uri(obj.avatar.url)
+        return None
+
+    def validate_avatar(self, value):
+        if value is None:
+            return value
+        if value.size > 1 * 1024 * 1024:
+            raise serializers.ValidationError("Ukuran foto maksimal 1 MB.")
+        return value
+
     def validate_agent(self, value):
-        """Cegah agent nitip ke perusahaan sebelah."""
-        user = self.context["request"].user
-        if value and user.company_id and value.company_id != user.company_id:
+        """Pastikan agent yang dipilih memang terdaftar."""
+        if value and not CustomUser.objects.filter(id=value.id, role="AGENT").exists():
             raise serializers.ValidationError(
-                "Agent tidak terdaftar di perusahaan ini."
+                "Agent tidak ditemukan."
             )
         return value
 

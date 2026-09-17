@@ -1,6 +1,5 @@
 from django.core.management.base import BaseCommand
 
-from qontak_sales.apps.accounts.models import Company
 from qontak_sales.apps.coa.models import COA
 
 DATA = [
@@ -11,7 +10,6 @@ DATA = [
 class Command(BaseCommand):
     help = 'Isi contoh data COA'
     def handle(self, *args, **kwargs):
-        for company in Company.objects.all():
-            for kode,nama,kategori,saldo in DATA:
-                COA.objects.update_or_create(kode=kode, company=company, defaults={'nama':nama,'kategori':kategori,'saldo':saldo})
+        for kode,nama,kategori,saldo in DATA:
+            COA.objects.update_or_create(kode=kode, defaults={'nama':nama,'kategori':kategori,'saldo':saldo})
         self.stdout.write(self.style.SUCCESS('Contoh data COA berhasil dibuat.'))

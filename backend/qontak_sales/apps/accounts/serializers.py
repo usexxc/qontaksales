@@ -25,19 +25,30 @@ class CompanySerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    company_name = serializers.CharField(source="company.name", read_only=True)
+    company_name = serializers.SerializerMethodField()
     avatar_url = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             "id", "username", "email", "first_name", "last_name",
-            "role", "company", "company_name", "avatar", "avatar_url", "phone",
+            "role", "company_name", "avatar", "avatar_url", "phone",
         ]
-        read_only_fields = ["id", "role", "avatar_url", "company"]
+        read_only_fields = ["id", "role", "avatar_url", "company_name"]
+
+    def get_company_name(self, obj):
+        company = Company.get()
+        return company.name if company else ""
 
     def validate_email(self, value):
         return unique_email_or_raise(value, pk=self.instance.pk if self.instance else None)
+
+    def validate_avatar(self, value):
+        if value is None:
+            return value
+        if value.size > 1 * 1024 * 1024:
+            raise serializers.ValidationError("Ukuran foto maksimal 1 MB.")
+        return value
 
     def get_avatar_url(self, obj):
         request = self.context.get("request")
@@ -60,6 +71,7 @@ class RegisterSerializer(serializers.Serializer):
         return value
 
     def create(self, validated_data):
+        # single-tenant: cuma ada satu perusahaan, dipakai bersama
         company, _ = Company.objects.get_or_create(
             name=validated_data["company_name"].strip()
         )
@@ -70,7 +82,6 @@ class RegisterSerializer(serializers.Serializer):
             password=validated_data["password"],
             first_name=name_parts[0] if name_parts else "",
             last_name=" ".join(name_parts[1:]),
-            company=company,
             role="MANAGER",
         )
         return user
@@ -84,6 +95,13 @@ class AgentCreateSerializer(serializers.Serializer):
     last_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")
     phone = serializers.CharField(max_length=20, required=False, allow_blank=True, default="")
     avatar = serializers.ImageField(required=False, allow_null=True)
+
+    def validate_avatar(self, value):
+        if value is None:
+            return value
+        if value.size > 1 * 1024 * 1024:
+            raise serializers.ValidationError("Ukuran foto maksimal 1 MB.")
+        return value
 
     def validate_username(self, value):
         if User.objects.filter(username=value).exists():

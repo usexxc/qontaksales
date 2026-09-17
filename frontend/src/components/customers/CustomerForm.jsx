@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Camera, Pencil } from "@phosphor-icons/react";
 import {
   cardCls,
   inputCls,
@@ -22,6 +23,8 @@ export default function CustomerForm({
 }) {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
   const { choices, loading, fetchChildren, resetChoices } = useRegionCascade();
 
   // pas dibuka buat edit: isi form + muat pilihan dropdown sejalur rantai wilayahnya
@@ -47,6 +50,8 @@ export default function CustomerForm({
       agent: editing.agent ? String(editing.agent) : "",
       notes: editing.notes || "",
     });
+    setAvatarFile(null);
+    setAvatarPreview(editing.avatar_url || null);
 
     const chain = [
       ["country", countryId],
@@ -89,28 +94,34 @@ export default function CustomerForm({
     try {
       setSaving(true);
 
-      const data = {
-        name: form.name.trim(),
-        company_name: form.company_name.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-        address: form.address.trim(),
-        status: form.status,
-        notes: form.notes.trim(),
-      };
-      // id wilayah dari dropdown berupa string, backend maunya number/null
+      const data = new FormData();
+      data.append("name", form.name.trim());
+      data.append("company_name", form.company_name.trim());
+      data.append("email", form.email.trim());
+      data.append("phone", form.phone.trim());
+      data.append("address", form.address.trim());
+      data.append("status", form.status);
+      data.append("notes", form.notes.trim());
+      // id wilayah: string kosong di multipart dibaca DRF sebagai None -> null
       for (const level of REGION_LEVELS) {
-        data[level] = form[level] ? Number(form[level]) : null;
+        data.append(level, form[level] ? Number(form[level]) : "");
       }
       if (form.agent) {
-        data.agent = Number(form.agent);
+        data.append("agent", Number(form.agent));
+      }
+      if (avatarFile) {
+        data.append("avatar", avatarFile);
       }
 
       if (editing) {
-        await api.put(`/customers/${editing.id}/`, data);
+        await api.put(`/customers/${editing.id}/`, data, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
         toast("Customer berhasil diperbarui", "success");
       } else {
-        await api.post("/customers/", data);
+        await api.post("/customers/", data, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
         toast("Customer berhasil ditambahkan", "success");
       }
       onDone();
@@ -139,6 +150,44 @@ export default function CustomerForm({
       </div>
 
       <form onSubmit={handleSubmit}>
+        <div className="mb-4">
+          <label className="group relative block w-fit cursor-pointer">
+            {avatarPreview ? (
+              <img
+                src={avatarPreview}
+                alt="avatar customer"
+                className="h-20 w-20 rounded-full object-cover ring-2 ring-border transition group-hover:ring-primary"
+              />
+            ) : (
+              <span className="flex h-20 w-20 items-center justify-center rounded-full bg-muted text-foreground/40 ring-2 ring-border transition group-hover:ring-primary">
+                <Camera size={26} />
+              </span>
+            )}
+            <span className="absolute -bottom-0.5 -right-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm ring-2 ring-card transition group-hover:scale-110">
+              <Pencil size={14} />
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                if (file.size > 1024 * 1024) {
+                  toast("Ukuran foto maksimal 1 MB.", "error");
+                  return;
+                }
+                setAvatarFile(file);
+                setAvatarPreview(URL.createObjectURL(file));
+              }}
+            />
+          </label>
+          <p className="mt-1.5 text-xs text-foreground/50">
+            Klik foto untuk ganti, maksimal 1 MB
+          </p>
+        </div>
+
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label className={labelCls}>Nama Customer</label>

@@ -21,19 +21,24 @@ class CustomerViewSet(viewsets.ModelViewSet):
     serializer_class = CustomerSerializer
     permission_classes = [IsAuthenticated]
 
+    def perform_create(self, serializer):
+        user = self.request.user
+        if user.role == "MANAGER":
+            obj = serializer.save()
+        else:
+            obj = serializer.save(agent=user)
+        obj.atur_nama_avatar()
+
+    def perform_update(self, serializer):
+        obj = serializer.save()
+        obj.atur_nama_avatar()
+
     def get_queryset(self):
         user = self.request.user
         qs = Customer.objects.select_related("agent").order_by("-created_at")
         if user.role == "MANAGER":
-            return qs.filter(company=user.company)
-        return qs.filter(company=user.company, agent=user)
-
-    def perform_create(self, serializer):
-        user = self.request.user
-        if user.role == "MANAGER":
-            serializer.save(company=user.company)
-        else:
-            serializer.save(agent=user, company=user.company)
+            return qs.all()
+        return qs.filter(agent=user)
 
 # header Excel boleh bebas, yang penting kena kata kuncinya
 HEADER_MAP = [
@@ -153,14 +158,6 @@ class CustomerImportView(APIView):
         return rows
 
     def _read_csv(self, file):
-        """Baca .csv jadi list of rows, format sama kayak _read_xlsx.
-
-        Dateng dari export kita sendiri (BOM + delimiter koma), tapi
-        tetap siapin delimiter lain (titik-koma/tab) biar gak mati pas
-        user save-an Excel default negara lain.
-        """
-        # BOM dibuang manual soalnya utf-8-sig cuma jalan kalau file dibuka
-        # dari path; dari upload kita baca bytes mentah
         raw = file.read().decode("utf-8-sig")
         if not raw.strip():
             raise ValueError("File CSV kosong.")
@@ -169,7 +166,7 @@ class CustomerImportView(APIView):
         try:
             dialect = csv.Sniffer().sniff(sample, delimiters=",;\t")
         except csv.Error:
-            dialect = csv.excel  # default: koma
+            dialect = csv.excel  
 
         rows = list(csv.reader(io.StringIO(raw), dialect))
         return [tuple(row) for row in rows if row]
@@ -261,14 +258,13 @@ class CustomerImportView(APIView):
 
         agent = None
         if record.get("agent"):
-            agent_qs = CustomUser.objects.filter(role="AGENT", company=user.company)
+            agent_qs = CustomUser.objects.filter(role="AGENT")
             email = record["agent"]
             agent = agent_qs.filter(email__iexact=email).first()
             if not agent:
-                return f"Agent '{email}' tidak ditemukan di perusahaan ini."
+                return f"Agent '{email}' tidak ditemukan."
 
         defaults = {
-            "company": user.company,
             "company_name": record.get("company_name", ""),
             "email": record.get("email", ""),
             "phone": record.get("phone", ""),
@@ -281,7 +277,7 @@ class CustomerImportView(APIView):
 
         name = record["name"]
         existing = Customer.objects.filter(
-            company=user.company, name__iexact=name
+            name__iexact=name
         ).first()
         if existing:
             for k, v in defaults.items():
@@ -336,8 +332,8 @@ class CustomerExportView(APIView):
             .order_by("name")
         )
         if user.role == "MANAGER":
-            return qs.filter(company=user.company)
-        return qs.filter(company=user.company, agent=user)
+            return qs.all()
+        return qs.filter(agent=user)
 
     def _build_rows(self, request, status_filter):
         qs = self._export_queryset(request.user)
@@ -388,7 +384,7 @@ class CustomerExportView(APIView):
     def _to_csv(self, rows):
         # utf-8-sig nambahin BOM di awal file biar Excel baca karakter
         # non-ASCII (é, —) bener, gak jadi Ã©/â€”
-        buffer = io.StringIO()
+        buffer = io.StringIO()  
         writer = csv.writer(buffer)
         writer.writerow(self.HEADERS)
         writer.writerows(rows)
@@ -402,77 +398,50 @@ class CustomerExportView(APIView):
 
 
 class CustomerTemplateView(APIView):
-    """Unduh template import customer (.xlsx atau .csv, ?type=)."""
+    """Template Excel kosong buat import customer + baris contoh."""
 
     permission_classes = [IsAuthenticated]
 
-    HEADERS = [
-        "Nama*", "Nama Perusahaan", "Email", "Telepon", "Alamat",
-        "Provinsi (kode)", "Kabupaten/Kota (kode)", "Kecamatan (kode)",
-        "Kelurahan/Desa (kode)", "Status", "Agent (email)", "Catatan",
-    ]
-    EXAMPLE = [
-        "Budi Hardware", "CV Budi Makmur", "budi@example.com", "081234567890",
-        "Jl. Merdeka No. 5", "32", "32.05", "32.05.01", "32.05.01.1001",
-        "CUSTOMER", "siti@pttest.test", "Pelanggan lama",
-    ]
-
     def get(self, request):
-        fmt = (request.query_params.get("type") or "xlsx").lower()
-        if fmt == "csv":
-            return self._to_csv()
-        return self._to_xlsx()
-
-    def _to_xlsx(self):
         wb = Workbook()
         ws = wb.active
-        ws.title = "Customer"
+        ws.title = "Customers"
+        ws.append([
+            "Nama", "Nama Perusahaan", "Email", "Telepon", "Alamat",
+            "Provinsi", "Kabupaten/Kota", "Kecamatan", "Kelurahan/Desa",
+            "Status", "Agent", "Catatan",
+        ])
+        for col in ws[1]:
+            col.font = Font(bold=True)
+        ws.append([
+            "Contoh Nama", "PT Contoh", "contoh@email.com", "021-1234567",
+            "Jl. Contoh No. 1", "32", "32.73", "32.73.07", "32.73.07.1001",
+            "PROSPECT", "agent@perusahaan.test", "Catatan awal",
+        ])
+        ws.column_dimensions["A"].width = 20
+        ws.column_dimensions["B"].width = 24
+        ws.column_dimensions["C"].width = 24
+        ws.column_dimensions["D"].width = 16
+        ws.column_dimensions["E"].width = 30
+        for col in "FGHI":
+            ws.column_dimensions[col].width = 16
+        ws.column_dimensions["L"].width = 22
+        ws.freeze_panes = "A2"
 
-        ws.append(self.HEADERS)
-        head_fill = PatternFill("solid", fgColor="1E293B")
-        for cell in ws[1]:
-            cell.font = Font(bold=True, color="FFFFFF")
-            cell.fill = head_fill
+        rules = wb.create_sheet("Aturan")
+        rules.append(["Kolom Wajib: Nama"])
+        rules.append(["Status: PROSPECT, CUSTOMER, atau INACTIVE"])
+        rules.append(["Wilayah: provinsi (2 angka) sampai kelurahan (4 grup)"])
+        rules.append(["Agent: harus email agent yang sudah terdaftar"])
+        rules.append(["Baris yang error akan dilompati, baris lain tetap masuk"])
+        for col in rules[1]:
+            col.font = Font(bold=True)
 
-        ws.append(self.EXAMPLE)
-        for cell in ws[2]:
-            cell.font = Font(color="666666", italic=True)
-
-        ws.append([])
-        notes = [
-            "Kolom bertanda * wajib diisi.",
-            "Kode wilayah = kode Kemendagri. Contoh: 32 = Jawa Barat, 32.05 = Kota Bandung,",
-            "  32.05.01 = kecamatan, 32.05.01.1001 = kelurahan.",
-            "Kosongkan kolom wilayah kalau tidak mau mengisi.",
-            "Status: PROSPECT / CUSTOMER / INACTIVE (kosong = PROSPECT).",
-            "Agent: isi email agent yang terdaftar; kosong = otomatis ke akun lo sendiri.",
-            "Kalau nama customer sudah ada (case-insensitive), datanya ditimpa (replace).",
-        ]
-        for line in notes:
-            ws.append([line])
-
-        widths = [22, 22, 24, 16, 28, 16, 20, 20, 22, 14, 22, 22]
-        for i, w in enumerate(widths):
-            ws.column_dimensions[chr(65 + i)].width = w
-
-        out = HttpResponse(
-            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        buf = io.BytesIO()
+        wb.save(buf)
+        resp = HttpResponse(
+            buf.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-        out["Content-Disposition"] = 'attachment; filename="template-import-customer.xlsx"'
-        wb.save(out)
-        return out
-
-    def _to_csv(self):
-        # versi CSV template: header + contoh doang, catatan instruksi
-        # dimasukin sebagai kolom komentar di baris contoh biar tetep kebaca
-        buffer = io.StringIO()
-        writer = csv.writer(buffer)
-        writer.writerow(self.HEADERS)
-        writer.writerow(self.EXAMPLE)
-
-        out = HttpResponse(
-            buffer.getvalue().encode("utf-8-sig"),
-            content_type="text/csv",
-        )
-        out["Content-Disposition"] = 'attachment; filename="template-import-customer.csv"'
-        return out
+        resp["Content-Disposition"] = 'attachment; filename="template-customer.xlsx"'
+        return resp

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
-import { List, SignOut } from "@phosphor-icons/react";
+import { useEffect, useRef, useState } from "react";
+import { Camera, List, SignOut } from "@phosphor-icons/react";
 import { useNavigate } from "react-router-dom";
 import api from "@/services/api";
+import { toast } from "@/components/ui/toast";
 
 function initials(name) {
   return name
@@ -16,6 +17,8 @@ function initials(name) {
 export default function TopBar({ onMenuClick }) {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     api.get("/auth/profile/").then((res) => setUser(res.data)).catch(() => {});
@@ -24,6 +27,35 @@ export default function TopBar({ onMenuClick }) {
   const logout = () => {
     localStorage.clear();
     navigate("/login", { replace: true });
+  };
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // biar bisa upload file yang sama lagi
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast("Pilih file gambar, ya.", "error");
+      return;
+    }
+    if (file.size > 1024 * 1024) {
+      toast("Ukuran foto maksimal 1 MB.", "error");
+      return;
+    }
+    try {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append("avatar", file);
+      const res = await api.patch("/auth/profile/", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setUser(res.data);
+      toast("Foto profil berhasil diperbarui", "success");
+    } catch (error) {
+      const msg = error.response?.data?.avatar?.[0] || "Gagal upload foto profil.";
+      toast(msg, "error");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const fullName = user
@@ -45,17 +77,40 @@ export default function TopBar({ onMenuClick }) {
           <span className="text-sm font-semibold">{fullName}</span>
           <span className="text-xs text-foreground/55">{user?.role || ""}</span>
         </div>
-        {user?.avatar_url ? (
-          <img
-            src={user.avatar_url}
-            alt={fullName}
-            className="h-9 w-9 rounded-full object-cover"
-          />
-        ) : (
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-semibold text-white">
-            {initials(fullName)}
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          title="Ganti foto profil"
+          aria-label="Ganti foto profil"
+          className="group relative cursor-pointer rounded-full disabled:opacity-60"
+        >
+          {user?.avatar_url ? (
+            <img
+              src={user.avatar_url}
+              alt={fullName}
+              className="h-9 w-9 rounded-full object-cover"
+            />
+          ) : (
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-semibold text-white">
+              {initials(fullName)}
+            </span>
+          )}
+          <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 text-white opacity-0 transition group-hover:opacity-100">
+            {uploading ? (
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            ) : (
+              <Camera size={16} />
+            )}
           </span>
-        )}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={handleAvatarChange}
+        />
         <button
           onClick={logout}
           title="Keluar"
