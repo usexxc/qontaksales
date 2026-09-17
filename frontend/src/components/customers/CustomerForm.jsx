@@ -31,8 +31,7 @@ export default function CustomerForm({
   useEffect(() => {
     if (!editing) return;
 
-    const country = countries[0];
-    const countryId = editing.province && country ? String(country.id) : "";
+    const countryId = editing.country ? String(editing.country) : (editing.province && countries[0] ? String(countries[0].id) : "");
 
     setForm({
       ...emptyForm,
@@ -54,8 +53,7 @@ export default function CustomerForm({
     setAvatarPreview(editing.avatar_url || null);
 
     const chain = [
-      ["country", countryId],
-      ["province", editing.province],
+      ["province", editing.country || (countries[0] && countries[0].id)],
       ["regency", editing.regency],
       ["district", editing.district],
     ];
@@ -103,6 +101,7 @@ export default function CustomerForm({
       data.append("status", form.status);
       data.append("notes", form.notes.trim());
       // id wilayah: string kosong di multipart dibaca DRF sebagai None -> null
+      data.append("country", form.country ? Number(form.country) : "");
       for (const level of REGION_LEVELS) {
         data.append(level, form[level] ? Number(form[level]) : "");
       }

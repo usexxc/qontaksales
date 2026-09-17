@@ -10,7 +10,13 @@ from django.core.management.base import BaseCommand, CommandError
 
 from qontak_sales.apps.accounts.models import Company
 from qontak_sales.apps.customers.models import Customer
-from qontak_sales.apps.regions.models import District, Province, Regency, Village
+from qontak_sales.apps.regions.models import (
+    Country,
+    District,
+    Province,
+    Regency,
+    Village,
+)
 
 User = get_user_model()
 
@@ -77,6 +83,7 @@ class Command(BaseCommand):
             raise CommandError(f"Manager '{opts['email']}' gak ditemukan.")
         company, _ = Company.objects.get_or_create(name="PT Test")
 
+        negara = Country.objects.first()
         provinces = list(Province.objects.all())
         if not provinces:
             raise CommandError(
@@ -119,6 +126,7 @@ class Command(BaseCommand):
                 email=email,
                 phone=f"021-{1000000 + i * 7777}",
                 address=f"Jl. {brand.title()} No. {i + 1}, {city}",
+                country=negara,
                 province=province,
                 regency=regency,
                 district=district,

@@ -43,7 +43,8 @@ export default function CustomerTable({
       customer.email?.toLowerCase().includes(keyword) ||
       customer.phone?.toLowerCase().includes(keyword) ||
       customer.regency_name?.toLowerCase().includes(keyword) ||
-      customer.province_name?.toLowerCase().includes(keyword)
+      customer.province_name?.toLowerCase().includes(keyword) ||
+      customer.country_name?.toLowerCase().includes(keyword)
     );
   });
 
@@ -104,6 +105,7 @@ export default function CustomerTable({
                   customer.district_name,
                   customer.regency_name,
                   customer.province_name,
+                  customer.country_name,
                 ]
                   .filter(Boolean)
                   .map(toTitle)

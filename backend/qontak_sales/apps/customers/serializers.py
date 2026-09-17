@@ -12,6 +12,7 @@ class CustomerSerializer(serializers.ModelSerializer):
     regency_name = serializers.CharField(source="regency.name", read_only=True, default=None)
     district_name = serializers.CharField(source="district.name", read_only=True, default=None)
     village_name = serializers.CharField(source="village.name", read_only=True, default=None)
+    country_name = serializers.CharField(source="country.name", read_only=True, default=None)
 
     class Meta:
         model = Customer
@@ -22,6 +23,8 @@ class CustomerSerializer(serializers.ModelSerializer):
             "email",
             "phone",
             "address",
+            "country",
+            "country_name",
             "province",
             "province_name",
             "regency",
@@ -43,6 +46,7 @@ class CustomerSerializer(serializers.ModelSerializer):
             "id",
             "agent_name",
             "avatar_url",
+            "country_name",
             "province_name",
             "regency_name",
             "district_name",
@@ -79,11 +83,16 @@ class CustomerSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """Cuma boleh milih wilayah yang beneran satu induk."""
+        country = attrs.get("country")
         province = attrs.get("province")
         regency = attrs.get("regency")
         district = attrs.get("district")
         village = attrs.get("village")
 
+        if province and country and province.country_id != country.id:
+            raise serializers.ValidationError(
+                {"province": "Provinsi tidak sesuai dengan negara yang dipilih."}
+            )
         if regency and province and regency.province_id != province.id:
             raise serializers.ValidationError(
                 {"regency": "Kabupaten/Kota tidak sesuai dengan provinsi yang dipilih."}
